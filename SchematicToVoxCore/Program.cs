@@ -8,13 +8,27 @@ using NDesk.Options;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 
 namespace FileToVox
 {
 	class Program
 	{
+		private const string INPUT_SEPARATOR = ";";
+		
+		private const string ASC_EXTENSION = ".asc";
+		private const string BINVOX_EXTENSION = ".binvox";
+		private const string CSV_EXTENSION = ".csv";
+		private const string PLY_EXTENSION = ".ply";
+		private const string PNG_EXTENSION = ".png";
+		private const string TIF_EXTENSION = ".tif";
+		private const string QB_EXTENSION = ".qb";
+		private const string SCHEMATIC_EXTENSION = ".schematic";
+		private const string XYZ_EXTENSION = ".xyz";
+		private const string VOX_EXTENSION = ".vox";
+		private const string OBJ_EXTENSION = ".obj";
+		private const string FBX_EXTENSION = ".fbx";
+		
 		private static string INPUT_PATH;
 		private static string OUTPUT_PATH;
 		private static string INPUT_COLOR_FILE;
@@ -31,7 +45,7 @@ namespace FileToVox
 
 		public static void Main(string[] args)
 		{
-			OptionSet options = new OptionSet()
+			OptionSet options = new()
 			{
 				{"i|input=", "input path", v => INPUT_PATH = v},
 				{"o|output=", "output path", v => OUTPUT_PATH = v},
@@ -40,7 +54,7 @@ namespace FileToVox
 				{"cl|color-limit=", "set the maximal number of colors for the palette", (int v) => COLOR_LIMIT =v },
 				{"cs|chunk-size=", "set the chunk size", (int v) => Schematic.CHUNK_SIZE = v},
 				{"e|excavate", "delete all voxels which doesn't have at least one face connected with air",  v => EXCAVATE = v != null },
-				{"h|help", "help informations", v => SHOW_HELP = v != null},
+				{"h|help", "help information", v => SHOW_HELP = v != null},
 				{"hm|heightmap=", "create voxels terrain from heightmap (only for PNG file)", (int v) => HEIGHT_MAP = v},
 				{"p|palette=", "set the palette", v => INPUT_PALETTE_FILE = v },
 				{"gs|grid-size=", "set the grid-size", (float v) => GRID_SIZE = v},
@@ -51,23 +65,16 @@ namespace FileToVox
 			try
 			{
 				List<string> extra = options.Parse(args);
-				DisplayInformations();
+				DisplayInformation();
 				CheckHelp(options);
 				CheckArguments();
 				DisplayArguments();
+				CreateOutputPathIfNeeded();
+				
+				bool success = Process();
 
-				bool success = false;
-				if (INPUT_PATH != null)
-				{
-					success = ProcessFile();
-				}
-
-				if (success)
-				{
-					CheckDebug();
-				}
-
-				Console.WriteLine("[INFO] Done.");
+				Console.WriteLine(success ? "[INFO] Done." : "[ERROR] Failed.");
+				
 				if (Schematic.DEBUG)
 				{
 					Console.ReadKey();
@@ -77,12 +84,26 @@ namespace FileToVox
 			{
 				Console.Write("FileToVox: ");
 				Console.WriteLine(e.Message);
-				Console.WriteLine("Try `FileToVox --help` for more informations.");
+				Console.WriteLine("Try `FileToVox --help` for more information.");
 				Console.ReadLine();
 			}
 		}
 
-		private static void DisplayInformations()
+		private static void CreateOutputPathIfNeeded()
+		{
+			string directoryPath = Path.GetFullPath(OUTPUT_PATH);
+			
+			if (Path.HasExtension(directoryPath))
+				directoryPath = directoryPath[..^Path.GetExtension(directoryPath).Length];
+
+			if (string.IsNullOrEmpty(directoryPath))
+				return;
+			
+			if (!Directory.Exists(directoryPath))
+				Directory.CreateDirectory(directoryPath);
+		}
+
+		private static void DisplayInformation()
 		{
 			Console.WriteLine("[INFO] FileToVox v" + Assembly.GetExecutingAssembly().GetName().Version);
 			Console.WriteLine("[INFO] Author: @Zarbuz. Contact : https://twitter.com/Zarbuz");
@@ -90,11 +111,10 @@ namespace FileToVox
 
 		private static void CheckHelp(OptionSet options)
 		{
-			if (SHOW_HELP)
-			{
-				ShowHelp(options);
-				Environment.Exit(0);
-			}
+			if (!SHOW_HELP) 
+				return;
+			ShowHelp(options);
+			Environment.Exit(0);
 		}
 
 		private static void CheckArguments()
@@ -103,11 +123,11 @@ namespace FileToVox
 				throw new ArgumentNullException("[ERROR] Missing required option: --i");
 			if (OUTPUT_PATH == null)
 				throw new ArgumentNullException("[ERROR] Missing required option: --o");
-			if (GRID_SIZE < 10 || GRID_SIZE > Schematic.MAX_WORLD_LENGTH)
+			if (GRID_SIZE is < 10 or > Schematic.MAX_WORLD_LENGTH)
 				throw new ArgumentException("[ERROR] --grid-size argument must be greater than 10 and smaller than " + Schematic.MAX_WORLD_LENGTH);
 			if (HEIGHT_MAP < 1)
 				throw new ArgumentException("[ERROR] --heightmap argument must be positive");
-			if (COLOR_LIMIT < 0 || COLOR_LIMIT > 256)
+			if (COLOR_LIMIT is < 0 or > 256)
 				throw new ArgumentException("[ERROR] --color-limit argument must be between 1 and 256");
 			if (Schematic.CHUNK_SIZE <= 10 || Schematic.CHUNK_SIZE > 256)
 				throw new ArgumentException("[ERROR] --chunk-size argument must be between 10 and 256");
@@ -125,7 +145,7 @@ namespace FileToVox
 				Console.WriteLine("[INFO] Specified palette file: " + INPUT_PALETTE_FILE);
 			if (COLOR_LIMIT != 256)
 				Console.WriteLine("[INFO] Specified color limit: " + COLOR_LIMIT);
-			if (GRID_SIZE != 10)
+			if (Math.Abs(GRID_SIZE - 10) > 0.0001f)
 				Console.WriteLine("[INFO] Specified grid size: " + GRID_SIZE);
 			if (Schematic.CHUNK_SIZE != 128)
 				Console.WriteLine("[INFO] Specified chunk size: " + Schematic.CHUNK_SIZE);
@@ -139,50 +159,70 @@ namespace FileToVox
 				Console.WriteLine("[INFO] Enabled option: debug");
 			if (DISABLE_QUANTIZATION)
 				Console.WriteLine("[INFO] Enabled option: disable-quantization");
-
-			Console.WriteLine("[INFO] Specified output path: " + Path.GetFullPath(OUTPUT_PATH));
 		}
 
-		private static bool ProcessFile()
+		private static bool Process()
 		{
-			string path = Path.GetFullPath(INPUT_PATH);
-			bool isFolder = Directory.Exists(path);
+			Console.WriteLine("Start processing...");
+			string[] paths = INPUT_PATH.Split(INPUT_SEPARATOR);
+			return Process(paths);
+		}
 
-			try
+		private static bool Process(IEnumerable<string> paths)
+		{
+			bool success = true;
+			
+			foreach (string path in paths)
 			{
-				AbstractToSchematic converter;
-				string[] files = INPUT_PATH.Split(";");
-				if (isFolder)
+				Console.WriteLine($"Processing path ({path})...");
+
+				if (string.IsNullOrEmpty(path))
 				{
-					List<string> images = Directory.GetFiles(path, "*.*", SearchOption.AllDirectories).Where(s => s.EndsWith(".png") && !string.IsNullOrEmpty(s)).ToList();
-					converter = new MultipleImageToSchematic(images, EXCAVATE, INPUT_COLOR_FILE, COLOR_LIMIT);
-					return SchematicToVox(converter);
+					Console.WriteLine("[ERROR] Cannot process empty path");
+					continue;
 				}
-				if (files.Length > 1)
+
+				if (Directory.Exists(path))
 				{
-					converter = new MultipleImageToSchematic(files.Where(s => s.EndsWith(".png") && !string.IsNullOrEmpty(s)).ToList(), EXCAVATE, INPUT_COLOR_FILE, COLOR_LIMIT);
-					return SchematicToVox(converter);
+					Console.WriteLine("[INFO] Processing Folder: " + path);
+					success = success && Process(Directory.GetFiles(path));
+					continue;
 				}
 
 				if (!File.Exists(path))
 				{
-					throw new FileNotFoundException("[ERROR] File not found at: " + path);
+					Console.WriteLine("[ERROR] File not found at: " + path);
+					continue;
 				}
 
-				converter = GetConverter(path);
+
+				if (!IsSupportedExtension(path))
+				{
+					Console.WriteLine("[ERROR] File extension not supported: " + path);
+					continue;
+				}
+				
+				success = success && ProcessFile(path);
+			}
+			
+			return success;
+		}
+
+		private static bool ProcessFile(string path)
+		{
+			Console.WriteLine("[INFO] File processed: " + path);
+			
+			try {
+				AbstractToSchematic converter = GetConverter(path);
 				if (converter != null)
 				{
 					return SchematicToVox(converter);
 				}
-
-				Console.WriteLine("[ERROR] Unsupported file extension !");
 			}
 			catch (Exception e)
 			{
 				Console.WriteLine(e);
-				Console.ReadLine();
 				return false;
-
 			}
 
 			return true;
@@ -192,30 +232,52 @@ namespace FileToVox
 		{
 			switch (Path.GetExtension(path))
 			{
-				case ".asc":
+				case ASC_EXTENSION:
 					return new ASCToSchematic(path);
-				case ".binvox":
+				case BINVOX_EXTENSION:
 					return new BinvoxToSchematic(path);
-				case ".csv":
+				case CSV_EXTENSION:
 					return new CSVToSchematic(path, GRID_SIZE, COLOR_LIMIT);
-				case ".ply":
+				case PLY_EXTENSION:
 					return new PLYToSchematic(path, GRID_SIZE, COLOR_LIMIT);
-				case ".png":
-				case ".tif":
+				case PNG_EXTENSION:
+				case TIF_EXTENSION:
 					return new ImageToSchematic(path, INPUT_COLOR_FILE, HEIGHT_MAP, EXCAVATE, COLOR, COLOR_LIMIT);
-				case ".qb":
+				case QB_EXTENSION:
 					return new QBToSchematic(path);
-				case ".schematic":
+				case SCHEMATIC_EXTENSION:
 					return new SchematicToSchematic(path, EXCAVATE);
-				case ".xyz":
+				case XYZ_EXTENSION:
 					return new XYZToSchematic(path, GRID_SIZE, COLOR_LIMIT);
-				case ".vox":
+				case VOX_EXTENSION:
 					return new VoxToSchematic(path);
-				case ".obj":
-				case ".fbx":
+				case OBJ_EXTENSION:
+				case FBX_EXTENSION:
 					throw new Exception("[FAILED] Voxelization of 3D models is no longer done in FileToVox but with MeshToVox. Check the url : https://github.com/Zarbuz/FileToVox/releases for download link");
 				default:
 					return null;
+			}
+		}
+		
+		private static bool IsSupportedExtension(string path)
+		{
+			switch (Path.GetExtension(path))
+			{
+				case ASC_EXTENSION:
+				case BINVOX_EXTENSION:
+				case CSV_EXTENSION:
+				case PLY_EXTENSION:
+				case PNG_EXTENSION:
+				case TIF_EXTENSION:
+				case QB_EXTENSION:
+				case SCHEMATIC_EXTENSION:
+				case XYZ_EXTENSION:
+				case VOX_EXTENSION:
+				case OBJ_EXTENSION:
+				case FBX_EXTENSION:
+					return true;
+				default:
+					return false;
 			}
 		}
 
@@ -232,23 +294,20 @@ namespace FileToVox
 				return false;
 			}
 
-			VoxWriter writer = new VoxWriter();
+			VoxWriter writer = new();
 
-			if (INPUT_PALETTE_FILE != null)
-			{
-				PaletteSchematicConverter converterPalette = new PaletteSchematicConverter(INPUT_PALETTE_FILE);
-				schematic = converterPalette.ConvertSchematic(schematic);
-				return writer.WriteModel(FormatOutputDestination(OUTPUT_PATH), converterPalette.GetPalette(), schematic);
-			}
-
-			return writer.WriteModel(FormatOutputDestination(OUTPUT_PATH), null, schematic);
+			if (INPUT_PALETTE_FILE == null)
+				return writer.WriteModel(FormatOutputDestination(converter.filePath), null, schematic);
+			
+			PaletteSchematicConverter converterPalette = new(INPUT_PALETTE_FILE);
+			schematic = converterPalette.ConvertSchematic(schematic);
+			return writer.WriteModel(FormatOutputDestination(converter.filePath), converterPalette.GetPalette(), schematic);
 		}
 
-		private static string FormatOutputDestination(string outputPath)
+		private static string FormatOutputDestination(string path)
 		{
-			outputPath = outputPath.Replace(".vox", "");
-			outputPath += ".vox";
-			return outputPath;
+			string fileName = Path.GetFileNameWithoutExtension(path);
+			return Path.Join(OUTPUT_PATH, fileName + VOX_EXTENSION);
 		}
 
 		private static void ShowHelp(OptionSet p)
@@ -256,15 +315,6 @@ namespace FileToVox
 			Console.WriteLine("Usage: FileToVox --i INPUT --o OUTPUT");
 			Console.WriteLine("Options: ");
 			p.WriteOptionDescriptions(Console.Out);
-		}
-
-		private static void CheckDebug()
-		{
-			if (Schematic.DEBUG)
-			{
-				VoxReader reader = new VoxReader();
-				reader.LoadModel(FormatOutputDestination(OUTPUT_PATH));
-			}
 		}
 
 		public static bool DisableQuantization()

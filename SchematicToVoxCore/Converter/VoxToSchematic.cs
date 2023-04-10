@@ -12,10 +12,10 @@ namespace FileToVox.Converter
 	public class VoxToSchematic : AbstractToSchematic
 	{
 		private VoxModel mVoxModel;
-		public VoxToSchematic(string path) : base(path)
+		public VoxToSchematic(string filePath) : base(filePath)
 		{
 			VoxReader reader = new VoxReader();
-			mVoxModel = reader.LoadModel(path);
+			mVoxModel = reader.LoadModel(filePath);
 		}
 
 		public override Schematic WriteSchematic()

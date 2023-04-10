@@ -13,7 +13,7 @@ namespace FileToVox.Converter.PointCloud
 		protected readonly float Scale;
 		protected readonly int ColorLimit;
 		private Schematic mSchematic;
-		protected PointCloudToSchematic(string path, float scale, int colorLimit) : base(path)
+		protected PointCloudToSchematic(string filePath, float scale, int colorLimit) : base(filePath)
 		{
 			Scale = scale;
 			ColorLimit = colorLimit;

@@ -337,9 +337,9 @@ namespace FileToVox.Converter.PointCloud
 			throw new NotImplementedException();
 		}
 
-		public PLYToSchematic(string path, float scale, int colorLimit) : base(path, scale, colorLimit)
+		public PLYToSchematic(string filePath, float scale, int colorLimit) : base(filePath, scale, colorLimit)
         {
-            MemoryMappedFile mmf = MemoryMappedFile.CreateFromFile(path, FileMode.Open);
+            MemoryMappedFile mmf = MemoryMappedFile.CreateFromFile(filePath, FileMode.Open);
             MemoryMappedViewStream mms = mmf.CreateViewStream();
 
             DataHeader header = ReadDataHeader(new StreamReader(mms));
