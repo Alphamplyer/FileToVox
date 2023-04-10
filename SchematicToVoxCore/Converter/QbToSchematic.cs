@@ -17,7 +17,7 @@ namespace FileToVox.Converter
         private const int CODE_FLAG = 2;
         private const int NEXT_SLICE_FLAG = 6;
 
-        public QBToSchematic(string path) : base(path)
+        public QBToSchematic(string filePath) : base(filePath)
         {
 
         }
@@ -31,7 +31,7 @@ namespace FileToVox.Converter
         private List<VoxelDTO> LoadVoxels()
         {
             List<VoxelDTO> voxels = new List<VoxelDTO>();
-            using (FileStream fs = File.OpenRead(PathFile))
+            using (FileStream fs = File.OpenRead(filePath))
             {
                 BinaryReader reader = new BinaryReader(fs);
                 uint version = reader.ReadUInt32();

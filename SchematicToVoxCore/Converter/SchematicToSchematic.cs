@@ -15,7 +15,7 @@ namespace FileToVox.Converter
 		private readonly bool mExcavate;
 		private readonly Dictionary<Tuple<int, int>, Color> mColors = new Dictionary<Tuple<int, int>, Color>();
 
-		public SchematicToSchematic(string path, bool excavate) : base(path)
+		public SchematicToSchematic(string filePath, bool excavate) : base(filePath)
 		{
 			mExcavate = excavate;
 			LoadBlocks();
@@ -23,7 +23,7 @@ namespace FileToVox.Converter
 
 		public override Schematic WriteSchematic()
 		{
-			NbtFile file = new NbtFile(PathFile);
+			NbtFile file = new NbtFile(filePath);
 			return LoadSchematic(file);
 		}
 

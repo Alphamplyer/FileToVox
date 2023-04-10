@@ -14,7 +14,7 @@ namespace FileToVox.Converter.Image
         protected readonly string ColorPath;
         protected readonly int ColorLimit;
 
-        public ImageToSchematic(string path, string colorPath, int height, bool excavate, bool color, int colorLimit) : base(path)
+        public ImageToSchematic(string filePath, string colorPath, int height, bool excavate, bool color, int colorLimit) : base(filePath)
         {
             ColorPath = colorPath;
             MaxHeight = height;
@@ -25,9 +25,9 @@ namespace FileToVox.Converter.Image
 
         public override Schematic WriteSchematic()
         {
-	        if (!File.Exists(PathFile))
+	        if (!File.Exists(filePath))
 	        {
-		        Console.WriteLine("[ERROR] The file path is invalid for path : " + PathFile);
+		        Console.WriteLine("[ERROR] The file path is invalid for path : " + filePath);
 		        return null;
 	        }
 
@@ -37,7 +37,7 @@ namespace FileToVox.Converter.Image
 		        return null;
 	        }
 
-	        MagickImage image = new MagickImage(PathFile);
+	        MagickImage image = new MagickImage(filePath);
 	        MagickImage colorImage = null;
 
 			if (!string.IsNullOrEmpty(ColorPath))
@@ -47,7 +47,7 @@ namespace FileToVox.Converter.Image
 
 			LoadImageParam loadImageParam = new LoadImageParam()
 			{
-				TexturePath = PathFile,
+				TexturePath = filePath,
 				ColorLimit = ColorLimit,
 				ColorTexturePath = ColorPath,
 				EnableColor = Color,

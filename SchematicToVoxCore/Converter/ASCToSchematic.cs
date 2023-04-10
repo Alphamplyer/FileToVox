@@ -10,7 +10,7 @@ namespace FileToVox.Converter
 {
     public class ASCToSchematic : AbstractToSchematic
     {
-        public ASCToSchematic(string path) : base(path)
+        public ASCToSchematic(string filePath) : base(filePath)
         {
 
         }
@@ -29,7 +29,7 @@ namespace FileToVox.Converter
             int nodata = -9999;
             float[,] points = new float[0,0]; //rows, cols
 
-            using (StreamReader file = new StreamReader(PathFile))
+            using (StreamReader file = new StreamReader(filePath))
             {
                 string line;
                 int row = 0;
